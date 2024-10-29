@@ -184,8 +184,7 @@ pub fn clearBackground(self: *Vdp, lineAddr: i32, pixelOffset: u8) void {
     }
 }
 
-pub fn rasterizeLine(allocator: *std.mem.Allocator, vdp: *Vdp, line: u32) void {
-    _ = allocator; // autofix
+pub fn rasterizeLine(vdp: *Vdp, line: u32) void {
     const line_addr: u32 = line;
     if (vdp.regs[1] & 64 == 0) {
         for (0..256) |i| {
@@ -305,21 +304,26 @@ pub fn hblank(self: *Vdp) u8 {
 }
 
 pub fn reset(self: *Vdp) void {
-    for (0x0000..0x4000) |i| {
-        self.vram[i] = 0;
-    }
+    // for (0x0000..0x4000) |i| {
+    //     self.vram[i] = 0;
+    // }
+    @memset(self.vram, 0x00);
+
     for (0..32) |i| {
         self.paletteR[i] = 0;
         self.paletteG[i] = 0;
         self.paletteB[i] = 0;
         self.palette[i] = 0;
     }
+
     for (0..16) |i| {
         self.regs[i] = 0;
     }
+
     for (2..6) |i| {
         self.regs[i] = 0xFF;
     }
+
     self.regs[6] = 0xFB;
     self.regs[10] = 0xFF;
     self.current_line = 0;

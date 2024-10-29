@@ -3,6 +3,7 @@ const vdp = @import("vdp.zig");
 const z80 = @import("z80");
 const memory = @import("mem.zig");
 const ports = @import("port.zig");
+const display = @import("display.zig");
 
 var hblankcount = 0;
 
@@ -33,13 +34,13 @@ pub fn readROM(path: []const u8) ![]u8 {
     const alloc = a.allocator();
     defer a.deinit();
 
-    const buf = try file.readToEndAlloc(alloc, stat.size+1);
+    const buf = try file.readToEndAlloc(alloc, stat.size + 1);
     return buf;
 }
 
 pub fn LoadROM(sms: *SMS, fileName: []const u8) !void {
     std.debug.print("Reading from file {s}\n", .{fileName});
-    var data = try readROM(fileName);
+    const data = try readROM(fileName);
 
     const a = std.heap.ArenaAllocator;
     const alloc = a.allocator();
@@ -47,35 +48,37 @@ pub fn LoadROM(sms: *SMS, fileName: []const u8) !void {
 
     const size = data.len;
     const numROMBanks = size / PAGE_SIZE;
-    
-    sms.memory.romBanks = try mem.alloc([]u8, numROMBanks);
+
+    sms.memory.rom_banks = try alloc.alloc([]u8, numROMBanks);
     std.debug.print("Found {d} ROM banks\n", .{numROMBanks});
 
-    for (sms.memory.romBanks) |*bank| {
-        bank.* = try mem.alloc(u8, PAGE_SIZE);
-        
+    for (sms.memory.rom_banks, 0..) |*bank, i| {
+        bank.* = try alloc.alloc(u8, PAGE_SIZE);
+
         var j: usize = 0;
         while (j < PAGE_SIZE) : (j += 1) {
-            // bank.[j] = data[(@intCast(usize, @divTrunc(i, PAGE_SIZE)) * PAGE_SIZE) + j];
-            bank.[j] = data[(@divTrunc(i, PAGE_SIZE)) * PAGE_SIZE) + j];
+            sms.memory.rom_banks[i][j] = data[(i * PAGE_SIZE) + j];
         }
     }
 
-    for (sms.memory.pages) |*page| {
-        page.* = @enumToInt(@mod(i, numROMBanks));
+    for (sms.memory.pages, 0..) |*page, i| {
+        page.* = @mod(i, numROMBanks);
     }
-    sms.memory.romPageMask = @enumToInt(numROMBanks - 1);
-    sms.memory.maskedPage0 = sms.memory.pages[0] & sms.memory.romPageMask;
-    sms.memory.maskedPage1 = sms.memory.pages[1] & sms.memory.romPageMask;
-    sms.memory.maskedPage2 = sms.memory.pages[2] & sms.memory.romPageMask;
 
-    sms.memory.romBank0 = try mem.alloc(u8, PAGE_SIZE);
-    defer sms.memory.romBank0.deinit();
-    
-    mem.copy(u8, sms.memory.romBank0, sms.memory.romBanks[sms.memory.maskedPage0]);
+    sms.memory.rom_page_mask = (numROMBanks - 1);
+    sms.memory.masked_page0 = sms.memory.pages[0] & sms.memory.rom_page_mask;
+    sms.memory.masked_page1 = sms.memory.pages[1] & sms.memory.rom_page_mask;
+    sms.memory.masked_page2 = sms.memory.pages[2] & sms.memory.rom_page_mask;
+
+    sms.memory.rom_bank0 = try alloc.alloc(u8, PAGE_SIZE);
+    @memcpy(sms.memory.rom_bank0, sms.memory.rom_banks[sms.memory.masked_page0]);
 }
 
-// pub fn loadROM(data: []const u8) void {
-//     const len = data.len;
-//     _ = len; // autofix
-// }
+// cycles == tstates
+pub fn render_frame(sms: *SMS, fileName: []const u8) display.DisplayData {
+    _ = fileName; // autofix
+    sms.vdp.status = 0;
+    while ((sms.vdp.status & 2) == 0) {
+        sms.cpu.cycles;
+    }
+}
